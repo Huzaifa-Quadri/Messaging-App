@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+
+import 'package:messaging_app/widgets/user_image_pick.dart';
 
 final _firebase = FirebaseAuth.instance;
 
@@ -16,29 +20,48 @@ class _AuthenticateScreenState extends State<AuthenticateScreen> {
   var _email_id = '';
   var _password = '';
   var _isLogin = true;
+  File? _pickedImage;
+  var _isLoading = false;
 
   void _onpressedsave() async {
-    if (!_form.currentState!.validate()) {
+
+    if (!_form.currentState!.validate() || !_isLogin && _pickedImage == null) {
+      print('Form is invalid or no image picked');
       return;
     }
 
     _form.currentState!.save();
     try {
+      setState(() {
+        _isLoading = true;
+      });
+
       if (_isLogin) {
-        final userCredentials = await  _firebase.signInWithEmailAndPassword(
+        print('Attempting to sign in...');
+        final userCredentials = await _firebase.signInWithEmailAndPassword(
             email: _email_id, password: _password
         );
-        print(userCredentials);
+        print('Signed in successfully: $userCredentials');
 
       } else {
         final userCredentials = await _firebase.createUserWithEmailAndPassword(
             email: _email_id, password: _password
         );
-        print(userCredentials);
+        // ref give referrence i.e., access to firebase cloud storage. Ref then returns this object that gives us access to this storage service in our Firebase project. And on this object we can call child to, in the end, create a new path in that storage bucket that is, in the end, managed by Firebase.
+        final storageRef = FirebaseStorage.instance
+        .ref()
+        .child('user_profile_images')
+        .child('${userCredentials.user!.uid}.jpeg');
+        //? TO upload the file at specified path generated above
+        await storageRef.putFile(_pickedImage!);
+        final imgUrl = await storageRef.getDownloadURL();
+        print(imgUrl);
+        setState(() {
+          _isLoading = false; 
+        });
       }
     } on FirebaseAuthException catch (error) {
-      // if (error.code == 'invalid-email ') {
-
+      // if (error.code == 'invalid-email ') {  //Not doing a specific Error Check
       // }
       if (mounted) {
         //! Avoid BuildContext could become invalid => Asynchronus Gap. /*
@@ -50,6 +73,10 @@ class _AuthenticateScreenState extends State<AuthenticateScreen> {
             content: Text(error.message ?? "Authentication Failed"),
           ),
         );
+        setState(() {
+          _isLoading = false; 
+        });
+        
       }
     }
   }
@@ -84,6 +111,12 @@ class _AuthenticateScreenState extends State<AuthenticateScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if(!_isLogin)
+                            UserImagePick(
+                              onPickedImage: (File setImage) {
+                                _pickedImage = setImage;
+                              },
+                            ),
                           TextFormField(                         //!  Email Textfield
                             decoration: const InputDecoration(
                                 labelText: 'Email Address'
@@ -112,26 +145,31 @@ class _AuthenticateScreenState extends State<AuthenticateScreen> {
                             onSaved: (value) => _password = value.toString(),
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .primaryContainer),
-                            onPressed: _onpressedsave,
-                            child: Text(_isLogin ? 'Login' : "Sign Up"),
-                          ),
-                          ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                _isLogin = !_isLogin; //* if _islogin == true => it will yeild false & if _islogin == false => it will yeild true
-                              });
-                            },
+                          if(_isLoading)
+                              const CircularProgressIndicator(),
+                          if(!_isLoading)
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer),
+                              onPressed: _onpressedsave,
+                              child: Text(_isLogin ? 'Login' : "Sign Up"),
+                            ),
+                          if(!_isLoading)
+                            ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isLogin = !_isLogin; //* if _islogin == true => it will yeild false & if _islogin == false => it will yeild true
+                                });
+                              },
                             child: Text(_isLogin
                                 ? "Create an Account or Login"
                                 : 'I already have an account.'
                                 //Rest closing brackets
                               ),
                           ),
+                          
                         ],
                       ),
                     ),
