@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -16,9 +17,11 @@ class AuthenticateScreen extends StatefulWidget {
 
 class _AuthenticateScreenState extends State<AuthenticateScreen> {
   final _form = GlobalKey<FormState>();
+ 
   // ignore: non_constant_identifier_names
   var _email_id = '';
   var _password = '';
+  var _username = '';
   var _isLogin = true;
   File? _pickedImage;
   var _isLoading = false;
@@ -43,19 +46,30 @@ class _AuthenticateScreenState extends State<AuthenticateScreen> {
         );
         print('Signed in successfully: $userCredentials');
 
-      } else {
+      } else {                                                                          //! If in Sign UP Mode
         final userCredentials = await _firebase.createUserWithEmailAndPassword(
             email: _email_id, password: _password
         );
         // ref give referrence i.e., access to firebase cloud storage. Ref then returns this object that gives us access to this storage service in our Firebase project. And on this object we can call child to, in the end, create a new path in that storage bucket that is, in the end, managed by Firebase.
         final storageRef = FirebaseStorage.instance
-        .ref()
-        .child('user_profile_images')
-        .child('${userCredentials.user!.uid}.jpeg');
+          .ref()
+          .child('user_profile_images')
+          .child('${userCredentials.user!.uid}.jpeg');
+
         //? TO upload the file at specified path generated above
         await storageRef.putFile(_pickedImage!);
+        
         final imgUrl = await storageRef.getDownloadURL();
-        print(imgUrl);
+        
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredentials.user!.uid)
+            .set({
+              'username' : _username,
+              'email' : _email_id,
+              'image_url' : imgUrl,
+            });
+
         setState(() {
           _isLoading = false; 
         });
@@ -131,6 +145,23 @@ class _AuthenticateScreenState extends State<AuthenticateScreen> {
                               return null;
                             },
                             onSaved: (value) => _email_id = value.toString(),
+                          ),
+                          if(!_isLogin)
+                            TextFormField(                         //!  Email Textfield
+                            decoration: const InputDecoration(
+                                labelText: 'Username'
+                              ),
+                            keyboardType: TextInputType.name,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            textCapitalization: TextCapitalization.none,
+                            validator: (value) {
+                              if (value == null || value.trim().length < 5) {
+                                return 'Enter a valid name';
+                              }
+                              return null;
+                            },
+                            onSaved: (value) => _username = value!,
                           ),
                           TextFormField(                          //!   Password Textfield
                             decoration:
