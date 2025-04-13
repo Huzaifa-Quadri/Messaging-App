@@ -35,7 +35,7 @@
 - `Cloud Firestore`  
 - `Provider` (State Management)  
 - `Material Design`, `GitHub`, `Responsive UI`  
-- `Push Notifications` (Future Scope; as paid feature in firebase lol)  
+- `Push Notifications` (Future Scope; as it is a paid feature in firebase lol)  
 
 <!--
 ## 📸 Preview
